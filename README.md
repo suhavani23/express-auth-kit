@@ -1,149 +1,151 @@
-# express-auth-kit
+# 🔐 express-auth-kit
 
-Plug-and-play authentication engine for Express. Supports **Google OAuth (PKCE)** and **native Email/Password authentication** out of the box with zero external crypto dependencies.
-
-Config lives in `.env`, so there are no code changes between projects.
+> Add **Google OAuth** and **Email/Password** login to any Express app in under 2 minutes. No complicated setup, no Passport.js boilerplate.
 
 ---
 
-## Features
+## ⚡ What is this?
 
-- 🔐 **Google OAuth 2.0**: RFC 7636 PKCE (S256) + cryptographic `state` CSRF protection.
-- ✉️ **Native Email & Password**: Built-in registration and login using Node's native `crypto.scrypt` hashing with timing-safe validation.
-- 🍪 **Hardened Sessions**: Anti session-fixation ID rotation on login, httpOnly cookies, Lax/Secure flags.
-- 🔌 **Pluggable Architecture**: Modular providers and framework adapters.
-- ⚡ **Zero External Crypto Dependencies**: No native node-gyp or bcrypt compilation required.
+A drop-in authentication module for Express. It handles:
+- **Sign in with Google** (secure PKCE + CSRF protection)
+- **Sign in with Email & Password** (built-in secure password hashing)
+- **Protected routes** (`auth.requireLogin`)
+- **Session management** (safe httpOnly cookies)
+
+Everything is configured through `.env`, so you can plug it into any project without modifying the auth code.
 
 ---
 
-## Quickstart
+## 🚀 3-Minute Quickstart
 
+### Step 1: Install dependencies
+In your Express project, run:
 ```bash
 npm install express express-session dotenv
 ```
 
-Copy this folder into your project, then:
-
-```js
-require("dotenv").config();
-const express = require("express");
-const auth = require("./auth-kit");
-
-const app = express();
-auth.init(app);
-
-// Protected route
-app.get("/dashboard", auth.requireLogin, (req, res) => res.json(req.user));
-
-app.listen(3000);
-```
-
-`.env` (see `.env.example`):
-
+### Step 2: Set up `.env`
+Create a `.env` file in your project root:
 ```env
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 BASE_URL=http://localhost:3000
-SESSION_SECRET=long-random-string
+SESSION_SECRET=type-any-long-random-secret-string
 PORT=3000
 ```
+*(In Google Cloud Console, add `http://localhost:3000/auth/google/callback` to your Authorized Redirect URIs).*
 
-In Google Cloud Console, ensure the authorized redirect URI matches `{BASE_URL}/auth/google/callback`.
+### Step 3: Plug it into your Express server
+```javascript
+require("dotenv").config();
+const express = require("express");
+const auth = require("./index"); // or require("express-auth-kit")
 
----
+const app = express();
 
-## Routes
+// 1. Initialize auth
+auth.init(app);
 
-| Route | Method | Purpose |
-|---|---|---|
-| `/auth/google` | `GET` | Starts Google OAuth flow with PKCE |
-| `/auth/google/callback` | `GET` | Google redirects back here |
-| `/auth/register` | `POST` | Register with `{ email, password, name? }` |
-| `/auth/login` | `POST` | Sign in with `{ email, password }` |
-| `/auth/logout` | `GET` | Destroys session and clears cookie |
-| `/auth/me` | `GET` | Returns `{ user }` or `401 Unauthorized` |
+// 2. Protect any route with auth.requireLogin
+app.get("/dashboard", auth.requireLogin, (req, res) => {
+  res.send(`Welcome back, ${req.user.name}! Your email is ${req.user.email}`);
+});
 
----
-
-## Options: `auth.init(app, options)`
-
-| Option | Default | Purpose |
-|---|---|---|
-| `basePath` | `/auth` | Prefix for all routes |
-| `successRedirect` | `/` | Redirect URL after successful login |
-| `failureRedirect` | `/?login=failed` | Redirect URL on error |
-| `logoutRedirect` | `/` | Redirect URL after logout |
-| `sessionMaxAgeMs` | 7 days | Session cookie lifetime |
-| `store` | in-memory | Session store (e.g. `connect-redis`, `connect-mongo`) |
-| `provider` | Google from `.env` | Any OAuth provider object |
-| `passwordAuth` | `true` | Enable/disable email and password auth |
-| `findUser` | `null` | Custom async hook: `(email) => userWithHash` |
-| `createUser` | `null` | Custom async hook: `({ id, name, email, passwordHash }) => user` |
-| `onLogin(user)` | `null` | Hook run after any login/register to sync with your DB |
-
-`req.user` is `{ id, name, email, emailVerified, picture, provider }` or `null`.
+app.listen(3000, () => console.log("Running on http://localhost:3000"));
+```
 
 ---
 
-### Saving users to your database (Prisma / Mongoose / SQL)
+## 💻 How to use it in your app
 
-```js
-auth.init(app, {
-  // Sync OAuth & email users into your database:
-  onLogin: async (user) => {
-    const row = await db.users.upsert({
-      where: { email: user.email },
-      update: { name: user.name, picture: user.picture },
-      create: { email: user.email, name: user.name, provider: user.provider },
-    });
-    return { ...user, dbId: row.id, role: row.role }; // becomes req.user
-  },
+### 1. In your HTML / Frontend:
 
-  // Optional: delegate password user lookups directly to your database
-  findUser: async (email) => {
-    return await db.users.findUnique({ where: { email } });
-  },
-  createUser: async ({ id, name, email, passwordHash }) => {
-    return await db.users.create({ data: { id, name, email, passwordHash, provider: "local" } });
-  },
+**Google Login Button:**
+```html
+<a href="/auth/google">Sign in with Google</a>
+```
+
+**Email & Password Login Form:**
+```html
+<form action="/auth/login" method="POST">
+  <input type="email" name="email" placeholder="Email" required />
+  <input type="password" name="password" placeholder="Password" required />
+  <button type="submit">Log In</button>
+</form>
+```
+
+**Email & Password Sign Up Form:**
+```html
+<form action="/auth/register" method="POST">
+  <input type="text" name="name" placeholder="Your Name" />
+  <input type="email" name="email" placeholder="Email" required />
+  <input type="password" name="password" placeholder="Password" required />
+  <button type="submit">Create Account</button>
+</form>
+```
+
+**Logout Link:**
+```html
+<a href="/auth/logout">Log Out</a>
+```
+
+---
+
+### 2. In your Backend routes:
+
+Check if someone is logged in:
+```javascript
+app.get("/", (req, res) => {
+  if (req.user) {
+    res.send(`Hello ${req.user.name} (${req.user.email})`);
+  } else {
+    res.send(`<a href="/auth/google">Please sign in</a>`);
+  }
+});
+```
+
+Protect an entire page or API route:
+```javascript
+// Automatically redirects non-logged-in users to login:
+app.get("/profile", auth.requireLogin, (req, res) => {
+  res.json({ user: req.user });
 });
 ```
 
 ---
 
-### Persistent sessions (production)
+## 📍 Available Routes
 
-```js
-const { createClient } = require("redis");
-const RedisStore = require("connect-redis").default;
-const client = createClient();
-client.connect();
+| Route | Method | What it does |
+|---|---|---|
+| `/auth/google` | `GET` | Starts Google login |
+| `/auth/google/callback` | `GET` | Google callback URL |
+| `/auth/register` | `POST` | Create account with `{ email, password, name }` |
+| `/auth/login` | `POST` | Sign in with `{ email, password }` |
+| `/auth/logout` | `GET` | Logs user out & clears session |
+| `/auth/me` | `GET` | API endpoint: returns current `{ user }` (or 401) |
 
-auth.init(app, { store: new RedisStore({ client }) });
+---
+
+## 💾 Saving Users to your Database (Optional)
+
+Want to save users to MongoDB, Prisma, or PostgreSQL? Just pass `onLogin` into `auth.init()`:
+
+```javascript
+auth.init(app, {
+  onLogin: async (user) => {
+    // Save or update user in your database:
+    // const dbUser = await db.user.upsert({ where: { email: user.email }, ... });
+    // return { ...user, role: dbUser.role };
+  }
+});
 ```
 
 ---
 
-### Project Structure
-
+## 🧪 Try the live demo
+Run the built-in showcase app to test it right away:
+```bash
+npm start
 ```
-core/
-  pkce.js             State + PKCE helpers (RFC 7636)
-  password.js         Native scrypt hashing & timing-safe equality check
-providers/
-  google.js           Google-specific URLs and profile mapping
-adapters/
-  express.js          Express routes, sessions, middleware
-index.js              Public API exports
-example.js            Showcase demo app with modern UI
-```
-
----
-
-## Security Notes
-
-- **PKCE (S256)**: Verifies the code exchange server-to-server with high entropy verifiers.
-- **CSRF State**: Unique random cryptographically generated `state` verified on callback.
-- **Anti Session-Fixation**: Re-generates session ID upon login so malicious pre-session cookies cannot hijack the account.
-- **Native scrypt**: Modern, memory-hard hashing resistant to GPU brute-forcing.
-- **HTTPS in Production**: Secure cookie flag activates automatically when `BASE_URL` begins with `https://`.
+Open **`http://localhost:3000`** in your browser.

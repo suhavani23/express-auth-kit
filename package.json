@@ -1,0 +1,14 @@
+{
+  "name": "auth-kit",
+  "version": "0.2.0",
+  "description": "Plug-and-play OAuth login for Express (Google now, other providers pluggable). PKCE + state, session based.",
+  "main": "index.js",
+  "scripts": { "start": "node example.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  },
+  "license": "MIT"
+}

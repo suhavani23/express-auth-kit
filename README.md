@@ -1,7 +1,20 @@
-# auth-kit
+# express-auth-kit
 
-Plug-and-play OAuth login for Express. Config lives in `.env`, so there are no code changes between projects.
-Google is built in; other providers plug in through a tiny interface.
+Plug-and-play authentication engine for Express. Supports **Google OAuth (PKCE)** and **native Email/Password authentication** out of the box with zero external crypto dependencies.
+
+Config lives in `.env`, so there are no code changes between projects.
+
+---
+
+## Features
+
+- 🔐 **Google OAuth 2.0**: RFC 7636 PKCE (S256) + cryptographic `state` CSRF protection.
+- ✉️ **Native Email & Password**: Built-in registration and login using Node's native `crypto.scrypt` hashing with timing-safe validation.
+- 🍪 **Hardened Sessions**: Anti session-fixation ID rotation on login, httpOnly cookies, Lax/Secure flags.
+- 🔌 **Pluggable Architecture**: Modular providers and framework adapters.
+- ⚡ **Zero External Crypto Dependencies**: No native node-gyp or bcrypt compilation required.
+
+---
 
 ## Quickstart
 
@@ -19,104 +32,118 @@ const auth = require("./auth-kit");
 const app = express();
 auth.init(app);
 
+// Protected route
 app.get("/dashboard", auth.requireLogin, (req, res) => res.json(req.user));
+
 app.listen(3000);
 ```
 
 `.env` (see `.env.example`):
 
-```
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
+```env
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
 BASE_URL=http://localhost:3000
 SESSION_SECRET=long-random-string
+PORT=3000
 ```
 
-In Google Cloud, the authorized redirect URI must be exactly `{BASE_URL}/auth/google/callback`.
+In Google Cloud Console, ensure the authorized redirect URI matches `{BASE_URL}/auth/google/callback`.
+
+---
 
 ## Routes
 
-| Route | Purpose |
-|---|---|
-| `GET /auth/google` | Start login |
-| `GET /auth/google/callback` | Provider redirects back here |
-| `GET /auth/logout` | End session |
-| `GET /auth/me` | `{ user }` or 401 |
+| Route | Method | Purpose |
+|---|---|---|
+| `/auth/google` | `GET` | Starts Google OAuth flow with PKCE |
+| `/auth/google/callback` | `GET` | Google redirects back here |
+| `/auth/register` | `POST` | Register with `{ email, password, name? }` |
+| `/auth/login` | `POST` | Sign in with `{ email, password }` |
+| `/auth/logout` | `GET` | Destroys session and clears cookie |
+| `/auth/me` | `GET` | Returns `{ user }` or `401 Unauthorized` |
+
+---
 
 ## Options: `auth.init(app, options)`
 
 | Option | Default | Purpose |
 |---|---|---|
 | `basePath` | `/auth` | Prefix for all routes |
-| `successRedirect` | `/` | After login |
-| `failureRedirect` | `/?login=failed` | Denied or invalid state |
-| `logoutRedirect` | `/` | After logout |
-| `sessionMaxAgeMs` | 7 days | Cookie lifetime |
-| `store` | in-memory | Session store (Redis, Mongo...) |
-| `provider` | Google from `.env` | Any provider object |
-| `onLogin(user)` | none | Save to your DB; return an object to replace `req.user` |
+| `successRedirect` | `/` | Redirect URL after successful login |
+| `failureRedirect` | `/?login=failed` | Redirect URL on error |
+| `logoutRedirect` | `/` | Redirect URL after logout |
+| `sessionMaxAgeMs` | 7 days | Session cookie lifetime |
+| `store` | in-memory | Session store (e.g. `connect-redis`, `connect-mongo`) |
+| `provider` | Google from `.env` | Any OAuth provider object |
+| `passwordAuth` | `true` | Enable/disable email and password auth |
+| `findUser` | `null` | Custom async hook: `(email) => userWithHash` |
+| `createUser` | `null` | Custom async hook: `({ id, name, email, passwordHash }) => user` |
+| `onLogin(user)` | `null` | Hook run after any login/register to sync with your DB |
 
 `req.user` is `{ id, name, email, emailVerified, picture, provider }` or `null`.
+
+---
+
+### Saving users to your database (Prisma / Mongoose / SQL)
+
+```js
+auth.init(app, {
+  // Sync OAuth & email users into your database:
+  onLogin: async (user) => {
+    const row = await db.users.upsert({
+      where: { email: user.email },
+      update: { name: user.name, picture: user.picture },
+      create: { email: user.email, name: user.name, provider: user.provider },
+    });
+    return { ...user, dbId: row.id, role: row.role }; // becomes req.user
+  },
+
+  // Optional: delegate password user lookups directly to your database
+  findUser: async (email) => {
+    return await db.users.findUnique({ where: { email } });
+  },
+  createUser: async ({ id, name, email, passwordHash }) => {
+    return await db.users.create({ data: { id, name, email, passwordHash, provider: "local" } });
+  },
+});
+```
+
+---
 
 ### Persistent sessions (production)
 
 ```js
 const { createClient } = require("redis");
 const RedisStore = require("connect-redis").default;
-const client = createClient(); client.connect();
+const client = createClient();
+client.connect();
 
 auth.init(app, { store: new RedisStore({ client }) });
 ```
 
-### Saving users to your database
+---
 
-```js
-auth.init(app, {
-  onLogin: async (user) => {
-    const row = await db.users.upsert({ googleId: user.id, email: user.email, name: user.name });
-    return { ...user, id: row.id, role: row.role }; // becomes req.user
-  },
-});
-```
-
-### Adding another provider (e.g. GitHub)
-
-A provider is a plain object:
-
-```js
-{
-  name: "github", // route becomes /auth/github
-  buildAuthUrl({ redirectUri, state, challenge }) { /* return URL string */ },
-  async fetchUser({ code, verifier, redirectUri }) {
-    /* exchange code, return { id, name, email, emailVerified, picture, provider } */
-  },
-}
-```
-
-Then `auth.init(app, { provider: myGithubProvider })`. Register `{BASE_URL}/auth/github/callback` with that provider.
-
-## Structure
+### Project Structure
 
 ```
-core/pkce.js           state + PKCE helpers (no framework code)
-providers/google.js    Google-specific URLs and profile mapping
-adapters/express.js    routes, sessions, middleware
-index.js               exports
+core/
+  pkce.js             State + PKCE helpers (RFC 7636)
+  password.js         Native scrypt hashing & timing-safe equality check
+providers/
+  google.js           Google-specific URLs and profile mapping
+adapters/
+  express.js          Express routes, sessions, middleware
+index.js              Public API exports
+example.js            Showcase demo app with modern UI
 ```
 
-Other frameworks (Fastify, Next.js) only need a new adapter. `core` and `providers` stay the same.
+---
 
-## How it works
+## Security Notes
 
-1. `/auth/google` creates a random `state` and a PKCE `code_verifier`, saves them in the session, and redirects to Google with `state` and the hashed `code_challenge`.
-2. Google redirects back with `?code&state`.
-3. We check `state` matches the session (blocks forged callbacks / CSRF).
-4. The server swaps the `code` + verifier + client secret for a token (server to server).
-5. We fetch the profile, normalize it, run `onLogin`, regenerate the session id (anti session-fixation), and store the user.
-6. The browser only holds an httpOnly cookie. Secrets and tokens never reach the frontend.
-
-## Notes
-
-- Use HTTPS in production. Secure cookies turn on automatically when `BASE_URL` starts with `https://`.
-- If your frontend is on another origin, set `successRedirect` to it and enable CORS with `credentials: true`.
-- Never commit `.env`.
+- **PKCE (S256)**: Verifies the code exchange server-to-server with high entropy verifiers.
+- **CSRF State**: Unique random cryptographically generated `state` verified on callback.
+- **Anti Session-Fixation**: Re-generates session ID upon login so malicious pre-session cookies cannot hijack the account.
+- **Native scrypt**: Modern, memory-hard hashing resistant to GPU brute-forcing.
+- **HTTPS in Production**: Secure cookie flag activates automatically when `BASE_URL` begins with `https://`.

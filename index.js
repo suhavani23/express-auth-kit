@@ -7,5 +7,8 @@ module.exports = {
   init: express.init,
   requireLogin: express.requireLogin,
   providers: { google: require("./providers/google") },
-  core: { pkce: require("./core/pkce") },
+  core: {
+    pkce: require("./core/pkce"),
+    password: require("./core/password"),
+  },
 };

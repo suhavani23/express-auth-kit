@@ -5,11 +5,11 @@ const auth = require("./index");
 const app = express();
 
 auth.init(app, {
-  // Optional: hook to persist or enrich user data upon login
+  // Optional: hook to persist or enrich user data upon login (both OAuth and Email/Password)
   onLogin: async (user) => {
-    console.log("⚡ User logged in successfully:", user.email);
-    // const row = await db.users.upsert({ googleId: user.id, ...user });
-    // return { ...user, id: row.id, role: row.role };
+    console.log(`⚡ User logged in (${user.provider}):`, user.email);
+    // const row = await db.users.upsert({ email: user.email, ...user });
+    // return { ...user, role: row.role };
   },
 });
 
@@ -36,6 +36,8 @@ function renderPage({ title, content }) {
       --accent: #38bdf8;
       --success: #10b981;
       --danger: #ef4444;
+      --input-bg: rgba(15, 23, 42, 0.6);
+      --input-border: rgba(255, 255, 255, 0.12);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,7 +60,7 @@ function renderPage({ title, content }) {
 
     .container {
       width: 100%;
-      max-width: 560px;
+      max-width: 500px;
       animation: fadeIn 0.4s ease-out;
     }
 
@@ -90,10 +92,10 @@ function renderPage({ title, content }) {
     }
 
     h1 {
-      font-size: 1.75rem;
+      font-size: 1.65rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
       background: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -101,9 +103,9 @@ function renderPage({ title, content }) {
 
     .subtitle {
       color: var(--text-muted);
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       line-height: 1.5;
-      margin-bottom: 1.75rem;
+      margin-bottom: 1.5rem;
     }
 
     .btn-google {
@@ -115,12 +117,12 @@ function renderPage({ title, content }) {
       color: #1f2937;
       text-decoration: none;
       font-weight: 600;
-      font-size: 0.95rem;
-      padding: 0.85rem 1.25rem;
+      font-size: 0.92rem;
+      padding: 0.8rem 1.25rem;
       border-radius: 12px;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-      margin-bottom: 1.75rem;
+      cursor: pointer;
     }
 
     .btn-google:hover {
@@ -130,30 +132,149 @@ function renderPage({ title, content }) {
     }
 
     .btn-google svg {
-      width: 20px;
-      height: 20px;
+      width: 19px;
+      height: 19px;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 1.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .divider::before { margin-right: 0.75rem; }
+    .divider::after { margin-left: 0.75rem; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.25rem;
+      border-radius: 10px;
+      margin-bottom: 1.25rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.82rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: rgba(99, 102, 241, 0.25);
+      color: #ffffff;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.01em;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.88rem;
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.8rem;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 11px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 0.5rem;
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .alert {
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .alert-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
     }
 
     .feature-grid {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0.75rem;
+      gap: 0.65rem;
       border-top: 1px solid rgba(255, 255, 255, 0.06);
-      padding-top: 1.5rem;
+      padding-top: 1.25rem;
+      margin-top: 1.5rem;
     }
 
     .feature-item {
       display: flex;
       align-items: flex-start;
-      gap: 0.75rem;
-      font-size: 0.85rem;
+      gap: 0.65rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
     }
 
     .feature-icon {
       color: var(--accent);
       flex-shrink: 0;
-      margin-top: 0.1rem;
     }
 
     /* Logged-in profile styles */
@@ -161,65 +282,73 @@ function renderPage({ title, content }) {
       display: flex;
       align-items: center;
       gap: 1.25rem;
-      margin-bottom: 1.75rem;
+      margin-bottom: 1.5rem;
     }
 
-    .avatar-wrapper {
-      position: relative;
-    }
+    .avatar-wrapper { position: relative; }
 
     .avatar {
-      width: 72px;
-      height: 72px;
+      width: 68px;
+      height: 68px;
       border-radius: 50%;
       border: 3px solid rgba(99, 102, 241, 0.5);
       box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
       object-fit: cover;
+      background: #1e293b;
     }
 
     .status-dot {
       position: absolute;
       bottom: 2px;
       right: 2px;
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       background: var(--success);
       border: 2px solid var(--bg);
       border-radius: 50%;
     }
 
     .profile-info h2 {
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       font-weight: 700;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.2rem;
     }
 
     .profile-email {
       color: var(--text-muted);
-      font-size: 0.88rem;
-      margin-bottom: 0.5rem;
+      font-size: 0.86rem;
+      margin-bottom: 0.4rem;
       display: flex;
       align-items: center;
       gap: 0.4rem;
+      flex-wrap: wrap;
     }
 
-    .badge-verified {
+    .badge-pill {
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      background: rgba(16, 185, 129, 0.12);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.25);
       padding: 0.15rem 0.5rem;
       border-radius: 9999px;
       font-size: 0.72rem;
       font-weight: 600;
     }
+    .badge-success {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .badge-provider {
+      background: rgba(99, 102, 241, 0.12);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      text-transform: capitalize;
+    }
 
     .action-group {
       display: flex;
       gap: 0.75rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       flex-wrap: wrap;
     }
 
@@ -238,32 +367,22 @@ function renderPage({ title, content }) {
       border: 1px solid transparent;
     }
 
-    .btn-primary {
-      background: var(--primary);
-      color: #ffffff;
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-      transform: translateY(-1px);
-    }
+    .btn-primary { background: var(--primary); color: #ffffff; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
     .btn-secondary {
       background: rgba(255, 255, 255, 0.05);
       border-color: rgba(255, 255, 255, 0.1);
       color: var(--text);
     }
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-    }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
 
     .btn-danger {
       background: rgba(239, 68, 68, 0.1);
       border-color: rgba(239, 68, 68, 0.2);
       color: #fca5a5;
     }
-    .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.2);
-    }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
 
     .code-viewer {
       background: rgba(0, 0, 0, 0.4);
@@ -274,8 +393,8 @@ function renderPage({ title, content }) {
       font-size: 0.78rem;
       color: #a5b4fc;
       overflow-x: auto;
-      max-height: 220px;
-      margin-top: 1rem;
+      max-height: 200px;
+      margin-top: 0.75rem;
     }
 
     .footer {
@@ -301,7 +420,7 @@ function renderPage({ title, content }) {
     <div style="text-align: center;">
       <span class="header-badge">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        AuthKit Express • v0.2.0
+        AuthKit Express • Multi-Method Auth
       </span>
     </div>
     
@@ -310,7 +429,7 @@ function renderPage({ title, content }) {
     </div>
 
     <div class="footer">
-      Drop-in OAuth module for Express apps &nbsp;•&nbsp; 
+      Google OAuth (PKCE) + Native Email/Password Auth &nbsp;•&nbsp; 
       <a href="https://github.com/suhavani23/express-auth-kit" target="_blank">View on GitHub</a>
     </div>
   </div>
@@ -324,14 +443,15 @@ app.get("/", (req, res) => {
     const content = `
       <div class="profile-header">
         <div class="avatar-wrapper">
-          <img class="avatar" src="${req.user.picture || 'https://via.placeholder.com/72'}" referrerpolicy="no-referrer" alt="${req.user.name}" />
+          <img class="avatar" src="${req.user.picture || 'https://api.dicebear.com/7.x/identicon/svg?seed=' + req.user.email}" referrerpolicy="no-referrer" alt="${req.user.name}" />
           <span class="status-dot"></span>
         </div>
         <div class="profile-info">
           <h2>${req.user.name}</h2>
           <div class="profile-email">
             ${req.user.email}
-            ${req.user.emailVerified ? '<span class="badge-verified">✓ Verified</span>' : ''}
+            <span class="badge-pill badge-provider">${req.user.provider || 'OAuth'}</span>
+            ${req.user.emailVerified ? '<span class="badge-pill badge-success">✓ Verified</span>' : ''}
           </div>
         </div>
       </div>
@@ -357,8 +477,9 @@ app.get("/", (req, res) => {
 
   const content = `
     <h1>Welcome to AuthKit</h1>
-    <p class="subtitle">A secure, zero-config OAuth login engine for Express with PKCE (S256), CSRF state validation, and httpOnly cookie sessions.</p>
+    <p class="subtitle">Secure authentication for Express. Sign in with Google or use native email/password.</p>
 
+    <!-- Google Button -->
     <a href="/auth/google" class="btn-google">
       <svg viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -369,45 +490,140 @@ app.get("/", (req, res) => {
       Continue with Google
     </a>
 
+    <div class="divider">or continue with email</div>
+
+    <!-- Alert Box -->
+    <div id="authAlert" class="alert alert-error"></div>
+
+    <!-- Mode Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+      <button class="tab-btn" id="tabRegister" onclick="switchTab('register')">Create Account</button>
+    </div>
+
+    <!-- Email/Password Form -->
+    <form id="authForm" onsubmit="handleAuthSubmit(event)">
+      <div class="form-group" id="nameGroup" style="display: none;">
+        <label class="form-label">Full Name</label>
+        <input class="form-input" type="text" id="nameInput" placeholder="Jane Doe" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input class="form-input" type="email" id="emailInput" placeholder="you@domain.com" required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="passwordInput" placeholder="••••••••" minlength="6" required />
+      </div>
+
+      <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
+    </form>
+
     <div class="feature-grid">
       <div class="feature-item">
         <span class="feature-icon">🔒</span>
-        <div><strong>RFC 7636 PKCE (S256):</strong> Protects authorization code swaps from interception.</div>
+        <div><strong>Google PKCE (S256):</strong> Secure code challenge with anti-CSRF state.</div>
       </div>
       <div class="feature-item">
-        <span class="feature-icon">🛡️</span>
-        <div><strong>Cryptographic State:</strong> Built-in anti-CSRF token verification per request.</div>
+        <span class="feature-icon">⚡</span>
+        <div><strong>Native Scrypt Hashing:</strong> Zero external dependencies, resistant to GPU attacks.</div>
       </div>
       <div class="feature-item">
         <span class="feature-icon">🍪</span>
-        <div><strong>Anti Session-Fixation:</strong> Regenerates session IDs automatically on login.</div>
+        <div><strong>HttpOnly Sessions:</strong> Anti session-fixation protection on every login.</div>
       </div>
     </div>
+
+    <script>
+      let currentMode = 'login';
+
+      function switchTab(mode) {
+        currentMode = mode;
+        const nameGroup = document.getElementById('nameGroup');
+        const submitBtn = document.getElementById('submitBtn');
+        const tabLogin = document.getElementById('tabLogin');
+        const tabRegister = document.getElementById('tabRegister');
+        const alertBox = document.getElementById('authAlert');
+        alertBox.style.display = 'none';
+
+        if (mode === 'register') {
+          nameGroup.style.display = 'block';
+          submitBtn.innerText = 'Create Account';
+          tabRegister.classList.add('active');
+          tabLogin.classList.remove('active');
+        } else {
+          nameGroup.style.display = 'none';
+          submitBtn.innerText = 'Sign In';
+          tabLogin.classList.add('active');
+          tabRegister.classList.remove('active');
+        }
+      }
+
+      async function handleAuthSubmit(e) {
+        e.preventDefault();
+        const alertBox = document.getElementById('authAlert');
+        const submitBtn = document.getElementById('submitBtn');
+        alertBox.style.display = 'none';
+
+        const email = document.getElementById('emailInput').value;
+        const password = document.getElementById('passwordInput').value;
+        const name = document.getElementById('nameInput').value;
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Processing...';
+
+        const endpoint = currentMode === 'register' ? '/auth/register' : '/auth/login';
+        const payload = currentMode === 'register' ? { email, password, name } : { email, password };
+
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Authentication failed');
+          }
+
+          // Successfully authenticated! Reload to show profile
+          window.location.reload();
+        } catch (err) {
+          alertBox.innerText = err.message;
+          alertBox.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.innerText = currentMode === 'register' ? 'Create Account' : 'Sign In';
+        }
+      }
+    </script>
   `;
   return res.send(renderPage({ title: "Sign In", content }));
 });
 
 // 2) Protected route showcase
 app.get("/dashboard", auth.requireLogin, (req, res) => {
-  // If API / JSON requested
   if (req.query.format === "json" || req.headers.accept?.includes("application/json")) {
     return res.json({ message: "Only authenticated sessions can view this", user: req.user });
   }
 
   const content = `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-      <span class="badge-verified" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">
+      <span class="badge-pill badge-success" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">
         🔒 Protected Route (auth.requireLogin)
       </span>
       <a href="/" class="btn btn-secondary" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">Back to Home</a>
     </div>
 
     <h1>Secret Dashboard Area</h1>
-    <p class="subtitle">This route is protected by <code>auth.requireLogin</code>. If you weren't authenticated, Express would have automatically redirected you to the Google login page.</p>
+    <p class="subtitle">This route is protected by <code>auth.requireLogin</code>. If you weren't authenticated, you would have been redirected to sign in.</p>
 
     <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
       <div style="font-weight: 700; color: #c7d2fe; margin-bottom: 0.4rem;">Access Granted for:</div>
       <div style="font-size: 1.1rem; font-weight: 600;">${req.user.name} &lt;${req.user.email}&gt;</div>
+      <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 0.35rem;">Auth Provider: <strong>${req.user.provider}</strong></div>
     </div>
 
     <div class="action-group">
